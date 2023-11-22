@@ -1,0 +1,336 @@
+#! /usr/bin/env python3
+
+from configparser import ConfigParser
+from configparser import ExtendedInterpolation
+from os.path import dirname
+from pathlib import Path
+from subprocess import run
+from time import perf_counter_ns
+
+import shutil
+import sys
+
+
+def main():
+    
+    # Measure the elapsed time in nanoseconds - Start
+    time_start = perf_counter_ns()
+    
+    ############################################################################
+    ### Step 0 - Read the config file
+    ############################################################################
+    
+    ### Determine the script directory path
+    script_dir = Path(dirname(Path(sys.argv[0]).resolve()))
+    
+    ### Determine the file path of the config file
+    # The config file is either provided as the first script parameter,
+    # or it is the file fastq2vcf_pipeline_commands.ini within the script
+    # directory
+    if len(sys.argv) > 1:
+        config_path = sys.argv[1]
+    else:
+        config_path = script_dir / "fastq2vcf_pipeline_commands.ini"
+    
+    ### Read the config file
+    config = ConfigParser(interpolation=ExtendedInterpolation())
+    config.read(config_path)
+    
+    ############################################################################
+    ### Step 1 - Index the FASTA reference file
+    ############################################################################
+    
+    reference_fasta_path = config.get("FilePaths", "reference_fasta_file", fallback=None)
+    if (reference_fasta_path):
+        reference_fasta_path = Path(reference_fasta_path)
+    if (config.getboolean("ProcessingSteps", "bwa_mem2_index_reference_fasta", fallback=False)):
+        run(["bwa-mem2", "index", reference_fasta_path])
+    
+    ############################################################################
+    ### Step 2 - Make a list of the raw FASTQ input files
+    ############################################################################
+    
+    fastq_dir = config.get("FilePaths", "fastq_dir", fallback=None)
+    if (fastq_dir):
+        fastq_dir = Path(fastq_dir)
+    fastq_file_names = []
+    if (
+        # Only if a processing step is configured which requires the list of FASTQ input files
+
+        config.getboolean("ProcessingSteps", "fastqc", fallback=False)
+        or config.getboolean("ProcessingSteps", "repair_fastq", fallback=False)
+        or config.getboolean("ProcessingSteps", "fastp", fallback=False)
+        or config.getboolean("ProcessingSteps", "mapping_bwa", fallback=False)
+        or config.getboolean("ProcessingSteps", "qualimap_bamqc", fallback=False)
+        or config.getboolean("ProcessingSteps", "qualimap_multi_bamqc", fallback=False)):
+        
+        fastq_file_names = [
+            (fastq_file_name_1.name, fastq_file_name_1.name.replace("_1.fastq", "_2.fastq"))
+            for fastq_file_name_1 in fastq_dir.glob("*_1.fastq*")]
+        # TODO check that the second file in each tuple actually exists and is a file
+    
+    ############################################################################
+    ### Step 3 - Check and prepare all required output directories:
+    ###
+    ### Create output directories if necessary and configured.
+    ### Clear output directories if configured.
+    ############################################################################
+    
+    ### fastqc output dir
+    fastqc_dir = config.get("FilePaths", "fastqc_dir", fallback=None)
+    if (fastqc_dir):
+        fastqc_dir = Path(fastqc_dir)
+    if (config.getboolean("ProcessingSteps", "fastqc", fallback=False)):
+        # Create the fastq directory if it does not already exist (only if configured)
+        if (not fastqc_dir.is_dir()):
+            if (config.getboolean("Global", "create_output_dirs", fallback=False)):
+                fastqc_dir.mkdir()
+            else:
+                raise SystemExit(f"Error: Required directory {fastqc_dir} does not exist.")
+        # Clear the fastq directory if not empty (only if configured)
+        if (config.getboolean("Global", "clear_output_dirs", fallback=False)
+            and any(fastqc_dir.iterdir())):
+            
+            shutil.rmtree(fastqc_dir)
+            fastqc_dir.mkdir()
+    
+    ### repair output dir
+    repair_dir = config.get("FilePaths", "repair_dir", fallback=None)
+    if (repair_dir):
+        repair_dir = Path(repair_dir)
+    if (config.getboolean("ProcessingSteps", "repair_fastq", fallback=False)):
+        # Create the repair directory if it does not already exist (only if configured)
+        if (not repair_dir.is_dir()):
+            if (config.getboolean("Global", "create_output_dirs", fallback=False)):
+                repair_dir.mkdir()
+            else:
+                raise SystemExit(f"Error: Required directory {repair_dir} does not exist.")
+        # Clear the repair directory if not empty (only if configured)
+        if (config.getboolean("Global", "clear_output_dirs", fallback=False)
+            and any(repair_dir.iterdir())):
+            
+            shutil.rmtree(repair_dir)
+            repair_dir.mkdir()
+
+    ### fastp output dir
+    fastp_dir = config.get("FilePaths", "fastp_dir", fallback=None)
+    if (fastp_dir):
+        fastp_dir = Path(fastp_dir)
+    if (config.getboolean("ProcessingSteps", "fastp", fallback=False)):
+        # Create the fastp directory if it does not already exist (only if configured)
+        if (not fastp_dir.is_dir()):
+            if (config.getboolean("Global", "create_output_dirs", fallback=False)):
+                fastp_dir.mkdir()
+            else:
+                raise SystemExit(f"Error: Required directory {fastp_dir} does not exist.")
+        # Clear the fastp directory if not empty (only if configured)
+        if (config.getboolean("Global", "clear_output_dirs", fallback=False)
+            and any(fastp_dir.iterdir())):
+            
+            shutil.rmtree(fastp_dir)
+            fastp_dir.mkdir()
+    
+    ### mapping_bwa output dir
+    mapping_bwa_dir = config.get("FilePaths", "mapping_bwa_dir", fallback=None)
+    if (mapping_bwa_dir):
+        mapping_bwa_dir = Path(mapping_bwa_dir)
+    if (config.getboolean("ProcessingSteps", "mapping_bwa", fallback=False)):
+        # Create the mapping_bwa directory if it does not already exist (only if configured)
+        if (not mapping_bwa_dir.is_dir()):
+            if (config.getboolean("Global", "create_output_dirs", fallback=False)):
+                mapping_bwa_dir.mkdir()
+            else:
+                raise SystemExit(f"Error: Required directory {mapping_bwa_dir} does not exist.")
+        # Clear the mapping_bwa directory if not empty (only if configured)
+        if (config.getboolean("Global", "clear_output_dirs", fallback=False)
+            and any(mapping_bwa_dir.iterdir())):
+            
+            shutil.rmtree(mapping_bwa_dir)
+            mapping_bwa_dir.mkdir()
+    
+    ### mapping_qc output dir
+    mapping_qc_dir = config.get("FilePaths", "mapping_qc_dir", fallback=None)
+    if (mapping_qc_dir):
+        mapping_qc_dir = Path(mapping_qc_dir)
+    if (config.getboolean("ProcessingSteps", "qualimap_bamqc", fallback=False)):
+        # Create the mapping_qc directory if it does not already exist (only if configured)
+        if (not mapping_qc_dir.is_dir()):
+            if (config.getboolean("Global", "create_output_dirs", fallback=False)):
+                mapping_qc_dir.mkdir()
+            else:
+                raise SystemExit(f"Error: Required directory {mapping_qc_dir} does not exist.")
+        # Clear the mapping_qc directory if not empty (only if configured)
+        if (config.getboolean("Global", "clear_output_dirs", fallback=False)
+            and any(mapping_qc_dir.iterdir())):
+            
+            shutil.rmtree(mapping_qc_dir)
+            mapping_qc_dir.mkdir()
+    
+    ############################################################################
+    ### Step 4 - Processing chain of the raw FASTQ input files:
+    ############################################################################
+    ### Create fastqc quality reports of the raw FASTQ input files
+    ### -> fastqc
+    ### ------------------------------------------------------------------------
+    ### Repair the raw FASTQ input files
+    ### -> repair.sh
+    ### ------------------------------------------------------------------------
+    ### Perform quality trimming of the raw/repaired FASTQ reads
+    ### -> fastp
+    ### ------------------------------------------------------------------------
+    ### Map the trimmed FASTQ files to the reference FASTA file
+    ### -> bwa-mem2 mem
+    ### ------------------------------------------------------------------------
+    ### Convert the SAM file into BAM format
+    ### -> samtools view
+    ### ------------------------------------------------------------------------
+    ### Sort the BAM file
+    ### -> samtools sort
+    ### ------------------------------------------------------------------------
+    ### Index the sorted BAM file
+    ### -> samtools index
+    ### ------------------------------------------------------------------------
+    ### Delete the unsorted BAM and SAM files
+    ### ------------------------------------------------------------------------
+    ### Create a mapping quality report
+    ### -> qualimap bamqc
+    ############################################################################
+    
+    for fastq_file_name_1, fastq_file_name_2 in fastq_file_names:
+        
+        # Determine the full file paths of the raw FASTQ input files
+        fastq_file_path_1 = fastq_dir / fastq_file_name_1
+        fastq_file_path_2 = fastq_dir / fastq_file_name_2
+        
+        # Create fastqc quality reports of the raw FASTQ input files
+        if (config.getboolean("ProcessingSteps", "fastqc", fallback=False)):
+            run([
+                "fastqc",
+                "--threads", "8",
+                "-o", fastqc_dir,
+                fastq_file_path_1,
+                fastq_file_path_2])
+        
+        # Repair the raw FASTQ input files
+        if (config.getboolean("ProcessingSteps", "repair_fastq", fallback=False)):
+            fastq_file_path_fixed_1 = repair_dir / fastq_file_name_1.replace("_1.fastq", "_fixed_1.fastq")
+            fastq_file_path_fixed_2 = repair_dir / fastq_file_name_2.replace("_2.fastq", "_fixed_2.fastq")
+            fastq_file_path_singletons = repair_dir / fastq_file_name_1.replace("_1.fastq", "_singletons.fastq")
+            run([
+                "repair.sh",
+                "in1=" + str(fastq_file_path_1),
+                "in2=" + str(fastq_file_path_2),
+                "out1=" + str(fastq_file_path_fixed_1),
+                "out2=" + str(fastq_file_path_fixed_2),
+                "outsingle=" + str(fastq_file_path_singletons)])
+        
+        # Perform quality trimming of the raw/repaired FASTQ reads
+        if (config.getboolean("ProcessingSteps", "fastp", fallback=False)):
+            fastq_file_path_fixed_1 = repair_dir / fastq_file_name_1.replace("_1.fastq", "_fixed_1.fastq")
+            fastq_file_path_fixed_2 = repair_dir / fastq_file_name_2.replace("_2.fastq", "_fixed_2.fastq")
+            fastq_file_path_trim_1 = fastp_dir / fastq_file_name_1.replace("_1.fastq", "_trim_1.fastq")
+            fastq_file_path_trim_2 = fastp_dir / fastq_file_name_2.replace("_2.fastq", "_trim_2.fastq")
+            fastp_report_path = fastp_dir / (fastq_file_name_1.replace("_1.fastq", "_trim_1_2.fastq") + "_report.html")
+            fastp_log_path = fastp_dir / (fastq_file_name_1.replace("_1.fastq", "_trim_1_2.fastq") + ".log")
+            run([
+                "fastp",
+                "--thread", "8",
+                "--in1", str(fastq_file_path_fixed_1),
+                "--in2", str(fastq_file_path_fixed_2),
+                "--out1", str(fastq_file_path_trim_1),
+                "--out2", str(fastq_file_path_trim_2),
+                "--length_required", "50",
+                "--html", fastp_report_path],
+                stderr=fastp_log_path.open("w"))
+        
+        # Map the trimmed FASTQ files to the reference FASTA file
+        # Convert the SAM file into BAM format
+        # Sort the BAM file
+        # Index the sorted BAM file
+        # Delete the unsorted BAM and SAM files
+        if (config.getboolean("ProcessingSteps", "mapping_bwa", fallback=False)):
+            fastq_file_path_trim_1 = fastp_dir / fastq_file_name_1.replace("_1.fastq", "_trim_1.fastq")
+            fastq_file_path_trim_2 = fastp_dir / fastq_file_name_2.replace("_2.fastq", "_trim_2.fastq")
+            sam_file_path = mapping_bwa_dir / fastq_file_name_1.replace("_1.fastq.gz", ".sam")
+            bam_file_path = mapping_bwa_dir / fastq_file_name_1.replace("_1.fastq.gz", ".bam")
+            sorted_bam_file_path = mapping_bwa_dir / fastq_file_name_1.replace("_1.fastq.gz", "_sorted.bam")
+            # Map the trimmed FASTQ files to the reference FASTA file
+            run([
+                "bwa-mem2", "mem", "-M",
+                "-t", "8",
+                reference_fasta_path,
+                fastq_file_path_trim_1,
+                fastq_file_path_trim_2],
+                stdout=sam_file_path.open("w"))
+            # Convert the SAM file into BAM format
+            run([
+                "samtools", "view", "--bam", "-S",
+                "--threads", "8",
+                sam_file_path],
+                stdout=bam_file_path.open("w"))
+            # Sort the BAM file
+            run([
+                "samtools", "sort",
+                "--threads", "8",
+                "-o", sorted_bam_file_path,
+                bam_file_path])
+            # Index the sorted BAM file
+            run([
+                "samtools", "index",
+                "--threads", "8",
+                sorted_bam_file_path])
+            # Delete the unsorted BAM and SAM files
+            sam_file_path.unlink()
+            bam_file_path.unlink()
+        
+        # Create a mapping quality report
+        if (config.getboolean("ProcessingSteps", "qualimap_bamqc", fallback=False)):
+            sorted_bam_file_path = mapping_bwa_dir / fastq_file_name_1.replace("_1.fastq.gz", "_sorted.bam")
+            qualimap_out_dir = mapping_qc_dir / fastq_file_name_1.replace("_1.fastq.gz", "")
+            qualimap_out_filename = fastq_file_name_1.replace("_1.fastq.gz", ".pdf")
+            run([
+                "qualimap", "bamqc",
+                "-nt", "8",
+                "-bam", sorted_bam_file_path,
+                "-outdir", qualimap_out_dir,
+                "-outformat", "PDF:HTML",
+                "-outfile", qualimap_out_filename])
+    
+    ############################################################################
+    ### Step 5 - Create an overview mapping quality report for all processed
+    ###          FASTQ files
+    ############################################################################
+    
+    if (config.getboolean("ProcessingSteps", "qualimap_multi_bamqc", fallback=False)):
+        input_groups_file_path = config.get("FilePaths", "input_groups_file", fallback=None)
+        if (input_groups_file_path):
+            input_groups_file_path = Path(input_groups_file_path)
+        else:
+            raise SystemExit("Error: input_groups_file not configured.")
+        if (not input_groups_file_path.is_file()):
+            raise SystemExit(f"Error: Required input groups file {input_groups_file_path} does not exist.")
+        qualimap_data_file_path = mapping_qc_dir / "input_groups.txt"
+        if (not qualimap_data_file_path.is_file()
+            or not input_groups_file_path.samefile(qualimap_data_file_path)):
+            shutil.copy(input_groups_file_path, qualimap_data_file_path)
+        
+        qualimap_out_dir = mapping_qc_dir / "multibamqc"
+        qualimap_out_filename = "Overview-Report.pdf"
+        run([
+            "qualimap", "multi-bamqc",
+            "-d", qualimap_data_file_path,
+            "-outdir", qualimap_out_dir,
+            "-outformat", "PDF",
+            "-outfile", qualimap_out_filename])
+    
+    ############################################################################
+    ### Elapsed time in nanoseconds
+    ############################################################################
+    
+    time_end = perf_counter_ns()
+    time_elapsed_ms = (time_end - time_start) / 1_000_000
+    print(f"Execution time in ms: {time_elapsed_ms}.")
+
+
+if __name__ == "__main__":
+    main()
