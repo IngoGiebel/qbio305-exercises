@@ -11,6 +11,8 @@ from typing import Optional
 import shutil
 import sys
 
+
+# Directory and file paths
 FILE_PATHS_SECTION = "FilePaths"
 REFERENCE_FASTA_FILE = "reference_fasta_file"
 FASTQ_DIR = "fastq_dir"
@@ -20,6 +22,17 @@ FASTP_DIR = "fastp_dir"
 MAPPING_BWA_DIR = "mapping_bwa_dir"
 MAPPING_QC_DIR = "mapping_qc_dir"
 
+# Processing steps
+PROCESSING_STEPS_SECTION = "ProcessingSteps"
+BWA_MEM2_INDEX_REFERENCE_FASTA = "bwa_mem2_index_reference_fasta"
+FASTQC = "fastqc"
+REPAIR_FASTQ = "repair_fastq"
+FASTP = "fastp"
+MAPPING_BWA = "mapping_bwa"
+QUALIMAP_BAMQC = "qualimap_bamqc"
+QUALIMAP_MULTI_BAMQC = "qualimap_multi_bamqc"
+
+# Configuration parameters
 config: ConfigParser = None
 
 
@@ -46,6 +59,10 @@ def file_path(config_var: str) -> Optional[Path]:
     return p
 
 
+def process_step(config_var: str) -> bool:
+    return config.getboolean(PROCESSING_STEPS_SECTION, config_var, fallback=False)
+
+
 def main():
     # Measure the elapsed time in nanoseconds - Start
     time_start = perf_counter_ns()
@@ -60,9 +77,8 @@ def main():
     # -- Step 1 - Index the FASTA reference file
     ###########################################################################
 
-    reference_fasta_path = file_path(REFERENCE_FASTA_FILE)
-    if config.getboolean("ProcessingSteps", "bwa_mem2_index_reference_fasta", fallback=False):
-        run(["bwa-mem2", "index", reference_fasta_path])
+    if process_step(BWA_MEM2_INDEX_REFERENCE_FASTA):
+        run(["bwa-mem2", "index", file_path(REFERENCE_FASTA_FILE)])
 
     ###########################################################################
     # -- Step 2 - Make a list of the raw FASTQ input files
@@ -74,12 +90,13 @@ def main():
             # Only if a processing step is configured which requires the list
             # of FASTQ input files
 
-            config.getboolean("ProcessingSteps", "fastqc", fallback=False)
-            or config.getboolean("ProcessingSteps", "repair_fastq", fallback=False)
-            or config.getboolean("ProcessingSteps", "fastp", fallback=False)
-            or config.getboolean("ProcessingSteps", "mapping_bwa", fallback=False)
-            or config.getboolean("ProcessingSteps", "qualimap_bamqc", fallback=False)
-            or config.getboolean("ProcessingSteps", "qualimap_multi_bamqc", fallback=False)):
+            process_step(FASTQC)
+            or process_step(REPAIR_FASTQ)
+            or process_step(FASTP)
+            or process_step(MAPPING_BWA)
+            or process_step(QUALIMAP_BAMQC)
+            or process_step(QUALIMAP_MULTI_BAMQC)):
+
         fastq_file_names = [
             (fastq_file_name_1.name, fastq_file_name_1.name.replace("_1.fastq", "_2.fastq"))
             for fastq_file_name_1 in fastq_dir.glob("*_1.fastq*")]
@@ -95,7 +112,7 @@ def main():
 
     # -- fastqc output dir
     fastqc_dir = file_path(FASTQC_DIR)
-    if config.getboolean("ProcessingSteps", "fastqc", fallback=False):
+    if process_step(FASTQC):
         # Create the fastq directory if it does not already exist
         # (only if configured)
         if not fastqc_dir.is_dir():
@@ -111,7 +128,7 @@ def main():
 
     # -- repair output dir
     repair_dir = file_path(REPAIR_DIR)
-    if config.getboolean("ProcessingSteps", "repair_fastq", fallback=False):
+    if process_step(REPAIR_FASTQ):
         # Create the repair directory if it does not already exist (only if configured)
         if not repair_dir.is_dir():
             if config.getboolean("Global", "create_output_dirs", fallback=False):
@@ -126,7 +143,7 @@ def main():
 
     # -- fastp output dir
     fastp_dir = file_path(FASTP_DIR)
-    if config.getboolean("ProcessingSteps", "fastp", fallback=False):
+    if process_step(FASTP):
         # Create the fastp directory if it does not already exist
         # (only if configured)
         if not fastp_dir.is_dir():
@@ -142,7 +159,7 @@ def main():
 
     # -- mapping_bwa output dir
     mapping_bwa_dir = file_path(MAPPING_BWA_DIR)
-    if config.getboolean("ProcessingSteps", "mapping_bwa", fallback=False):
+    if process_step(MAPPING_BWA):
         # Create the mapping_bwa directory if it does not already exist
         # (only if configured)
         if not mapping_bwa_dir.is_dir():
@@ -158,7 +175,7 @@ def main():
 
     # -- mapping_qc output dir
     mapping_qc_dir = file_path(MAPPING_QC_DIR)
-    if config.getboolean("ProcessingSteps", "qualimap_bamqc", fallback=False):
+    if process_step(QUALIMAP_BAMQC):
         # Create the mapping_qc directory if it does not already exist (only if configured)
         if not mapping_qc_dir.is_dir():
             if config.getboolean("Global", "create_output_dirs", fallback=False):
@@ -208,7 +225,7 @@ def main():
         fastq_file_path_2 = fastq_dir / fastq_file_name_2
 
         # Create fastqc quality reports of the raw FASTQ input files
-        if config.getboolean("ProcessingSteps", "fastqc", fallback=False):
+        if process_step(FASTQC):
             run(
                 [
                     "fastqc",
@@ -218,7 +235,7 @@ def main():
                     fastq_file_path_2])
 
         # Repair the raw FASTQ input files
-        if config.getboolean("ProcessingSteps", "repair_fastq", fallback=False):
+        if process_step(REPAIR_FASTQ):
             fastq_file_path_fixed_1 = repair_dir / fastq_file_name_1.replace("_1.fastq", "_fixed_1.fastq")
             fastq_file_path_fixed_2 = repair_dir / fastq_file_name_2.replace("_2.fastq", "_fixed_2.fastq")
             fastq_file_path_singletons = repair_dir / fastq_file_name_1.replace("_1.fastq", "_singletons.fastq")
@@ -232,7 +249,7 @@ def main():
                     "outsingle=" + str(fastq_file_path_singletons)])
 
         # Perform quality trimming of the raw/repaired FASTQ reads
-        if config.getboolean("ProcessingSteps", "fastp", fallback=False):
+        if process_step(FASTP):
             fastq_file_path_fixed_1 = repair_dir / fastq_file_name_1.replace("_1.fastq", "_fixed_1.fastq")
             fastq_file_path_fixed_2 = repair_dir / fastq_file_name_2.replace("_2.fastq", "_fixed_2.fastq")
             fastq_file_path_trim_1 = fastp_dir / fastq_file_name_1.replace("_1.fastq", "_trim_1.fastq")
@@ -256,7 +273,7 @@ def main():
         # Sort the BAM file
         # Index the sorted BAM file
         # Delete the unsorted BAM and SAM files
-        if config.getboolean("ProcessingSteps", "mapping_bwa", fallback=False):
+        if process_step(MAPPING_BWA):
             fastq_file_path_trim_1 = fastp_dir / fastq_file_name_1.replace("_1.fastq", "_trim_1.fastq")
             fastq_file_path_trim_2 = fastp_dir / fastq_file_name_2.replace("_2.fastq", "_trim_2.fastq")
             sam_file_path = mapping_bwa_dir / fastq_file_name_1.replace("_1.fastq.gz", ".sam")
@@ -267,7 +284,7 @@ def main():
                 [
                     "bwa-mem2", "mem", "-M",
                     "-t", "8",
-                    reference_fasta_path,
+                    file_path(REFERENCE_FASTA_FILE),
                     fastq_file_path_trim_1,
                     fastq_file_path_trim_2],
                 stdout=sam_file_path.open("w"))
@@ -296,7 +313,7 @@ def main():
             bam_file_path.unlink()
 
         # Create a mapping quality report
-        if config.getboolean("ProcessingSteps", "qualimap_bamqc", fallback=False):
+        if process_step(QUALIMAP_BAMQC):
             sorted_bam_file_path = mapping_bwa_dir / fastq_file_name_1.replace("_1.fastq.gz", "_sorted.bam")
             qualimap_out_dir = mapping_qc_dir / fastq_file_name_1.replace("_1.fastq.gz", "")
             qualimap_out_filename = fastq_file_name_1.replace("_1.fastq.gz", ".pdf")
@@ -314,7 +331,7 @@ def main():
     # --          FASTQ files
     ###########################################################################
 
-    if config.getboolean("ProcessingSteps", "qualimap_multi_bamqc", fallback=False):
+    if process_step(QUALIMAP_MULTI_BAMQC):
         input_groups_file_path = config.get("FilePaths", "input_groups_file", fallback=None)
         if input_groups_file_path:
             input_groups_file_path = Path(input_groups_file_path)
