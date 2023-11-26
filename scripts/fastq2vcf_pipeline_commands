@@ -182,6 +182,16 @@ def map_bwa(f1: str, f2: str) -> None:
     bam_file_path.unlink()
 
 
+def qualimap_bamqc(f1: str) -> None:
+    run([
+        "qualimap", "bamqc",
+        "-nt", "8",
+        "-bam", file_path(MAPPING_BWA_DIR) / f1.replace("_1.fastq.gz", "_sorted.bam"),
+        "-outdir", file_path(MAPPING_QC_DIR) / f1.replace("_1.fastq.gz", ""),
+        "-outformat", "PDF:HTML",
+        "-outfile", f1.replace("_1.fastq.gz", ".pdf")])
+
+
 def main() -> None:
     # Measure the elapsed time in nanoseconds - Start
     time_start = perf_counter_ns()
@@ -255,17 +265,9 @@ def main() -> None:
         # Delete the unsorted BAM and SAM files
         if process_step(MAPPING_BWA):
             map_bwa(fastq_file_name_1, fastq_file_name_2)
-
         # Create a mapping quality report
         if process_step(QUALIMAP_BAMQC):
-            run(
-                [
-                    "qualimap", "bamqc",
-                    "-nt", "8",
-                    "-bam", file_path(MAPPING_BWA_DIR) / fastq_file_name_1.replace("_1.fastq.gz", "_sorted.bam"),
-                    "-outdir", file_path(MAPPING_QC_DIR) / fastq_file_name_1.replace("_1.fastq.gz", ""),
-                    "-outformat", "PDF:HTML",
-                    "-outfile", fastq_file_name_1.replace("_1.fastq.gz", ".pdf")])
+            qualimap_bamqc(fastq_file_name_1)
 
     ###########################################################################
     # -- Step 4 - Create an overview mapping quality report for all processed
