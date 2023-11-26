@@ -63,6 +63,10 @@ def process_step(config_var: str) -> bool:
     return config.getboolean(PROCESSING_STEPS_SECTION, config_var, fallback=False)
 
 
+def bwa_mem2_index_reference_fasta():
+    run(["bwa-mem2", "index", file_path(REFERENCE_FASTA_FILE)])
+
+
 def main():
     # Measure the elapsed time in nanoseconds - Start
     time_start = perf_counter_ns()
@@ -78,7 +82,7 @@ def main():
     ###########################################################################
 
     if process_step(BWA_MEM2_INDEX_REFERENCE_FASTA):
-        run(["bwa-mem2", "index", file_path(REFERENCE_FASTA_FILE)])
+        bwa_mem2_index_reference_fasta()
 
     ###########################################################################
     # -- Step 2 - Make a list of the raw FASTQ input files
