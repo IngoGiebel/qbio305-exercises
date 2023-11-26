@@ -125,6 +125,19 @@ def fastqc(fastq_file_name_1: str, fastq_file_name_2: str) -> None:
             file_path(FASTQ_DIR) / fastq_file_name_2])
 
 
+def repair_fastq(fastq_file_name_1: str, fastq_file_name_2: str) -> None:
+    run(
+        [
+            "repair.sh",
+            "overwrite=true",
+            "in1=" + str(file_path(FASTQ_DIR) / fastq_file_name_1),
+            "in2=" + str(file_path(FASTQ_DIR) / fastq_file_name_2),
+            "out1=" + str(file_path(REPAIR_DIR) / fastq_file_name_1.replace("_1.fastq", "_fixed_1.fastq")),
+            "out2=" + str(file_path(REPAIR_DIR) / fastq_file_name_2.replace("_2.fastq", "_fixed_2.fastq")),
+            "outsingle=" +
+            str(file_path(REPAIR_DIR) / fastq_file_name_1.replace("_1.fastq", "_singletons.fastq"))])
+
+
 def main() -> None:
     # Measure the elapsed time in nanoseconds - Start
     time_start = perf_counter_ns()
@@ -187,16 +200,7 @@ def main() -> None:
             fastqc(fastq_file_name_1, fastq_file_name_2)
         # Repair the raw FASTQ input files
         if process_step(REPAIR_FASTQ):
-            run(
-                [
-                    "repair.sh",
-                    "overwrite=true",
-                    "in1=" + str(file_path(FASTQ_DIR) / fastq_file_name_1),
-                    "in2=" + str(file_path(FASTQ_DIR) / fastq_file_name_2),
-                    "out1=" + str(file_path(REPAIR_DIR) / fastq_file_name_1.replace("_1.fastq", "_fixed_1.fastq")),
-                    "out2=" + str(file_path(REPAIR_DIR) / fastq_file_name_2.replace("_2.fastq", "_fixed_2.fastq")),
-                    "outsingle=" +
-                    str(file_path(REPAIR_DIR) / fastq_file_name_1.replace("_1.fastq", "_singletons.fastq"))])
+            repair_fastq(fastq_file_name_1, fastq_file_name_2)
 
         # Perform quality trimming of the raw/repaired FASTQ reads
         if process_step(FASTP):
