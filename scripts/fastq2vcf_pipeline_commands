@@ -148,6 +148,40 @@ def fastp(f1: str, f2: str) -> None:
         stderr=(file_path(FASTP_DIR) / (f1.replace("_1.fastq", "_trim_1_2.fastq") + ".log")).open("w"))
 
 
+def map_bwa(f1: str, f2: str) -> None:
+    sam_file_path = file_path(MAPPING_BWA_DIR) / f1.replace("_1.fastq.gz", ".sam")
+    bam_file_path = file_path(MAPPING_BWA_DIR) / f1.replace("_1.fastq.gz", ".bam")
+    sorted_bam_file_path = file_path(MAPPING_BWA_DIR) / f1.replace("_1.fastq.gz", "_sorted.bam")
+    # Map the trimmed FASTQ files to the reference FASTA file
+    run([
+        "bwa-mem2", "mem", "-M",
+        "-t", "8",
+        file_path(REFERENCE_FASTA_FILE),
+        file_path(FASTP_DIR) / f1.replace("_1.fastq", "_trim_1.fastq"),
+        file_path(FASTP_DIR) / f2.replace("_2.fastq", "_trim_2.fastq")],
+        stdout=sam_file_path.open("w"))
+    # Convert the SAM file into BAM format
+    run([
+        "samtools", "view", "--bam", "-S",
+        "--threads", "8",
+        sam_file_path],
+        stdout=bam_file_path.open("w"))
+    # Sort the BAM file
+    run([
+        "samtools", "sort",
+        "--threads", "8",
+        "-o", sorted_bam_file_path,
+        bam_file_path])
+    # Index the sorted BAM file
+    run([
+        "samtools", "index",
+        "--threads", "8",
+        sorted_bam_file_path])
+    # Delete the unsorted BAM and SAM files
+    sam_file_path.unlink()
+    bam_file_path.unlink()
+
+
 def main() -> None:
     # Measure the elapsed time in nanoseconds - Start
     time_start = perf_counter_ns()
@@ -211,64 +245,16 @@ def main() -> None:
         # Repair the raw FASTQ input files
         if process_step(REPAIR_FASTQ):
             repair_fastq(fastq_file_name_1, fastq_file_name_2)
-
         # Perform quality trimming of the raw/repaired FASTQ reads
         if process_step(FASTP):
-            run(
-                [
-                    "fastp",
-                    "--thread", "8",
-                    "--in1", str(file_path(REPAIR_DIR) / fastq_file_name_1.replace("_1.fastq", "_fixed_1.fastq")),
-                    "--in2", str(file_path(REPAIR_DIR) / fastq_file_name_2.replace("_2.fastq", "_fixed_2.fastq")),
-                    "--out1", str(file_path(FASTP_DIR) / fastq_file_name_1.replace("_1.fastq", "_trim_1.fastq")),
-                    "--out2", str(file_path(FASTP_DIR) / fastq_file_name_2.replace("_2.fastq", "_trim_2.fastq")),
-                    "--length_required", "50",
-                    "--html", file_path(FASTP_DIR) / (fastq_file_name_1.replace("_1.fastq", "_trim_1_2.fastq")
-                                                      + "_report.html")],
-                stderr=(file_path(FASTP_DIR) / (fastq_file_name_1.replace("_1.fastq", "_trim_1_2.fastq")
-                                                + ".log")).open("w"))
-
+            fastp(fastq_file_name_1, fastq_file_name_2)
         # Map the trimmed FASTQ files to the reference FASTA file
         # Convert the SAM file into BAM format
         # Sort the BAM file
         # Index the sorted BAM file
         # Delete the unsorted BAM and SAM files
         if process_step(MAPPING_BWA):
-            sam_file_path = file_path(MAPPING_BWA_DIR) / fastq_file_name_1.replace("_1.fastq.gz", ".sam")
-            bam_file_path = file_path(MAPPING_BWA_DIR) / fastq_file_name_1.replace("_1.fastq.gz", ".bam")
-            sorted_bam_file_path = file_path(MAPPING_BWA_DIR) / fastq_file_name_1.replace("_1.fastq.gz", "_sorted.bam")
-            # Map the trimmed FASTQ files to the reference FASTA file
-            run(
-                [
-                    "bwa-mem2", "mem", "-M",
-                    "-t", "8",
-                    file_path(REFERENCE_FASTA_FILE),
-                    file_path(FASTP_DIR) / fastq_file_name_1.replace("_1.fastq", "_trim_1.fastq"),
-                    file_path(FASTP_DIR) / fastq_file_name_2.replace("_2.fastq", "_trim_2.fastq")],
-                stdout=sam_file_path.open("w"))
-            # Convert the SAM file into BAM format
-            run(
-                [
-                    "samtools", "view", "--bam", "-S",
-                    "--threads", "8",
-                    sam_file_path],
-                stdout=bam_file_path.open("w"))
-            # Sort the BAM file
-            run(
-                [
-                    "samtools", "sort",
-                    "--threads", "8",
-                    "-o", sorted_bam_file_path,
-                    bam_file_path])
-            # Index the sorted BAM file
-            run(
-                [
-                    "samtools", "index",
-                    "--threads", "8",
-                    sorted_bam_file_path])
-            # Delete the unsorted BAM and SAM files
-            sam_file_path.unlink()
-            bam_file_path.unlink()
+            map_bwa(fastq_file_name_1, fastq_file_name_2)
 
         # Create a mapping quality report
         if process_step(QUALIMAP_BAMQC):
