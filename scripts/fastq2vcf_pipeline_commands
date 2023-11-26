@@ -197,7 +197,7 @@ def qualimap_multi_bamqc() -> None:
         raise SystemExit("Error: input_groups_file not configured.")
     if not file_path(INPUT_GROUPS_FILE).is_file():
         raise SystemExit(f"Error: Required input groups file {file_path(INPUT_GROUPS_FILE)} does not exist.")
-    qualimap_data_file_path = mapping_qc_dir / "input_groups.txt"
+    qualimap_data_file_path = file_path(MAPPING_QC_DIR) / "input_groups.txt"
     if not qualimap_data_file_path.is_file() or not file_path(INPUT_GROUPS_FILE).samefile(qualimap_data_file_path):
         shutil.copy(file_path(INPUT_GROUPS_FILE), qualimap_data_file_path)
     run([
