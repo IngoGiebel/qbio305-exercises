@@ -115,6 +115,16 @@ def bwa_mem2_index_reference_fasta() -> None:
     run(["bwa-mem2", "index", file_path(REFERENCE_FASTA_FILE)])
 
 
+def fastqc(fastq_file_name_1: str, fastq_file_name_2: str) -> None:
+    run(
+        [
+            "fastqc",
+            "--threads", "8",
+            "-o", file_path(FASTQC_DIR),
+            file_path(FASTQ_DIR) / fastq_file_name_1,
+            file_path(FASTQ_DIR) / fastq_file_name_2])
+
+
 def main() -> None:
     # Measure the elapsed time in nanoseconds - Start
     time_start = perf_counter_ns()
@@ -174,14 +184,7 @@ def main() -> None:
     for fastq_file_name_1, fastq_file_name_2 in get_fastq_file_names():
         # Create fastqc quality reports of the raw FASTQ input files
         if process_step(FASTQC):
-            run(
-                [
-                    "fastqc",
-                    "--threads", "8",
-                    "-o", file_path(FASTQC_DIR),
-                    file_path(FASTQ_DIR) / fastq_file_name_1,
-                    file_path(FASTQ_DIR) / fastq_file_name_2])
-
+            fastqc(fastq_file_name_1, fastq_file_name_2)
         # Repair the raw FASTQ input files
         if process_step(REPAIR_FASTQ):
             run(
