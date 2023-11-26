@@ -115,27 +115,37 @@ def bwa_mem2_index_reference_fasta() -> None:
     run(["bwa-mem2", "index", file_path(REFERENCE_FASTA_FILE)])
 
 
-def fastqc(fastq_file_name_1: str, fastq_file_name_2: str) -> None:
-    run(
-        [
-            "fastqc",
-            "--threads", "8",
-            "-o", file_path(FASTQC_DIR),
-            file_path(FASTQ_DIR) / fastq_file_name_1,
-            file_path(FASTQ_DIR) / fastq_file_name_2])
+def fastqc(f1: str, f2: str) -> None:
+    run([
+        "fastqc",
+        "--threads", "8",
+        "-o", file_path(FASTQC_DIR),
+        file_path(FASTQ_DIR) / f1,
+        file_path(FASTQ_DIR) / f2])
 
 
-def repair_fastq(fastq_file_name_1: str, fastq_file_name_2: str) -> None:
-    run(
-        [
-            "repair.sh",
-            "overwrite=true",
-            "in1=" + str(file_path(FASTQ_DIR) / fastq_file_name_1),
-            "in2=" + str(file_path(FASTQ_DIR) / fastq_file_name_2),
-            "out1=" + str(file_path(REPAIR_DIR) / fastq_file_name_1.replace("_1.fastq", "_fixed_1.fastq")),
-            "out2=" + str(file_path(REPAIR_DIR) / fastq_file_name_2.replace("_2.fastq", "_fixed_2.fastq")),
-            "outsingle=" +
-            str(file_path(REPAIR_DIR) / fastq_file_name_1.replace("_1.fastq", "_singletons.fastq"))])
+def repair_fastq(f1: str, f2: str) -> None:
+    run([
+        "repair.sh",
+        "overwrite=true",
+        "in1=" + str(file_path(FASTQ_DIR) / f1),
+        "in2=" + str(file_path(FASTQ_DIR) / f2),
+        "out1=" + str(file_path(REPAIR_DIR) / f1.replace("_1.fastq", "_fixed_1.fastq")),
+        "out2=" + str(file_path(REPAIR_DIR) / f2.replace("_2.fastq", "_fixed_2.fastq")),
+        "outsingle=" + str(file_path(REPAIR_DIR) / f1.replace("_1.fastq", "_singletons.fastq"))])
+
+
+def fastp(f1: str, f2: str) -> None:
+    run([
+        "fastp",
+        "--thread", "8",
+        "--in1", str(file_path(REPAIR_DIR) / f1.replace("_1.fastq", "_fixed_1.fastq")),
+        "--in2", str(file_path(REPAIR_DIR) / f2.replace("_2.fastq", "_fixed_2.fastq")),
+        "--out1", str(file_path(FASTP_DIR) / f1.replace("_1.fastq", "_trim_1.fastq")),
+        "--out2", str(file_path(FASTP_DIR) / f2.replace("_2.fastq", "_trim_2.fastq")),
+        "--length_required", "50",
+        "--html", file_path(FASTP_DIR) / (f1.replace("_1.fastq", "_trim_1_2.fastq") + "_report.html")],
+        stderr=(file_path(FASTP_DIR) / (f1.replace("_1.fastq", "_trim_1_2.fastq") + ".log")).open("w"))
 
 
 def main() -> None:
