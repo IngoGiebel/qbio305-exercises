@@ -36,6 +36,7 @@ REPAIR_DIR = "repair_dir"
 FASTP_DIR = "fastp_dir"
 MAPPING_BWA_DIR = "mapping_bwa_dir"
 MAPPING_QC_DIR = "mapping_qc_dir"
+INPUT_GROUPS_FILE = "input_groups_file"
 
 # Configuration parameters
 config: ConfigParser = None
@@ -97,6 +98,19 @@ def check_and_prepare_output_dir(output_dir: Path) -> None:
         output_dir.mkdir()
 
 
+def check_and_prepare_output_dirs() -> None:
+    if process_step(FASTQC):
+        check_and_prepare_output_dir(file_path(FASTQC_DIR))
+    if process_step(REPAIR_FASTQ):
+        check_and_prepare_output_dir(file_path(REPAIR_DIR))
+    if process_step(FASTP):
+        check_and_prepare_output_dir(file_path(FASTP_DIR))
+    if process_step(MAPPING_BWA):
+        check_and_prepare_output_dir(file_path(MAPPING_BWA_DIR))
+    if process_step(QUALIMAP_BAMQC):
+        check_and_prepare_output_dir(file_path(MAPPING_QC_DIR))
+
+
 def bwa_mem2_index_reference_fasta() -> None:
     run(["bwa-mem2", "index", file_path(REFERENCE_FASTA_FILE)])
 
@@ -125,21 +139,7 @@ def main() -> None:
     # -- Clear output directories if configured.
     ###########################################################################
 
-    # -- fastqc output dir
-    if process_step(FASTQC):
-        check_and_prepare_output_dir(file_path(FASTQC_DIR))
-    # -- repair output dir
-    if process_step(REPAIR_FASTQ):
-        check_and_prepare_output_dir(file_path(REPAIR_DIR))
-    # -- fastp output dir
-    if process_step(FASTP):
-        check_and_prepare_output_dir(file_path(FASTP_DIR))
-    # -- mapping_bwa output dir
-    if process_step(MAPPING_BWA):
-        check_and_prepare_output_dir(file_path(MAPPING_BWA_DIR))
-    # -- mapping_qc output dir
-    if process_step(QUALIMAP_BAMQC):
-        check_and_prepare_output_dir(file_path(MAPPING_QC_DIR))
+    check_and_prepare_output_dirs()
 
     ###########################################################################
     # -- Step 3 - Processing chain of the raw FASTQ input files:
@@ -172,55 +172,44 @@ def main() -> None:
     ###########################################################################
 
     for fastq_file_name_1, fastq_file_name_2 in get_fastq_file_names():
-
-        # Determine the full file paths of the raw FASTQ input files
-        fastq_file_path_1 = file_path(FASTQ_DIR) / fastq_file_name_1
-        fastq_file_path_2 = file_path(FASTQ_DIR) / fastq_file_name_2
-
         # Create fastqc quality reports of the raw FASTQ input files
         if process_step(FASTQC):
             run(
                 [
                     "fastqc",
                     "--threads", "8",
-                    "-o", fastqc_dir,
-                    fastq_file_path_1,
-                    fastq_file_path_2])
+                    "-o", file_path(FASTQC_DIR),
+                    file_path(FASTQ_DIR) / fastq_file_name_1,
+                    file_path(FASTQ_DIR) / fastq_file_name_2])
 
         # Repair the raw FASTQ input files
         if process_step(REPAIR_FASTQ):
-            fastq_file_path_fixed_1 = repair_dir / fastq_file_name_1.replace("_1.fastq", "_fixed_1.fastq")
-            fastq_file_path_fixed_2 = repair_dir / fastq_file_name_2.replace("_2.fastq", "_fixed_2.fastq")
-            fastq_file_path_singletons = repair_dir / fastq_file_name_1.replace("_1.fastq", "_singletons.fastq")
             run(
                 [
                     "repair.sh",
                     "overwrite=true",
-                    "in1=" + str(fastq_file_path_1),
-                    "in2=" + str(fastq_file_path_2),
-                    "out1=" + str(fastq_file_path_fixed_1),
-                    "out2=" + str(fastq_file_path_fixed_2),
-                    "outsingle=" + str(fastq_file_path_singletons)])
+                    "in1=" + str(file_path(FASTQ_DIR) / fastq_file_name_1),
+                    "in2=" + str(file_path(FASTQ_DIR) / fastq_file_name_2),
+                    "out1=" + str(file_path(REPAIR_DIR) / fastq_file_name_1.replace("_1.fastq", "_fixed_1.fastq")),
+                    "out2=" + str(file_path(REPAIR_DIR) / fastq_file_name_2.replace("_2.fastq", "_fixed_2.fastq")),
+                    "outsingle=" +
+                    str(file_path(REPAIR_DIR) / fastq_file_name_1.replace("_1.fastq", "_singletons.fastq"))])
 
         # Perform quality trimming of the raw/repaired FASTQ reads
         if process_step(FASTP):
-            fastq_file_path_fixed_1 = repair_dir / fastq_file_name_1.replace("_1.fastq", "_fixed_1.fastq")
-            fastq_file_path_fixed_2 = repair_dir / fastq_file_name_2.replace("_2.fastq", "_fixed_2.fastq")
-            fastq_file_path_trim_1 = fastp_dir / fastq_file_name_1.replace("_1.fastq", "_trim_1.fastq")
-            fastq_file_path_trim_2 = fastp_dir / fastq_file_name_2.replace("_2.fastq", "_trim_2.fastq")
-            fastp_report_path = fastp_dir / (fastq_file_name_1.replace("_1.fastq", "_trim_1_2.fastq") + "_report.html")
-            fastp_log_path = fastp_dir / (fastq_file_name_1.replace("_1.fastq", "_trim_1_2.fastq") + ".log")
             run(
                 [
                     "fastp",
                     "--thread", "8",
-                    "--in1", str(fastq_file_path_fixed_1),
-                    "--in2", str(fastq_file_path_fixed_2),
-                    "--out1", str(fastq_file_path_trim_1),
-                    "--out2", str(fastq_file_path_trim_2),
+                    "--in1", str(file_path(REPAIR_DIR) / fastq_file_name_1.replace("_1.fastq", "_fixed_1.fastq")),
+                    "--in2", str(file_path(REPAIR_DIR) / fastq_file_name_2.replace("_2.fastq", "_fixed_2.fastq")),
+                    "--out1", str(file_path(FASTP_DIR) / fastq_file_name_1.replace("_1.fastq", "_trim_1.fastq")),
+                    "--out2", str(file_path(FASTP_DIR) / fastq_file_name_2.replace("_2.fastq", "_trim_2.fastq")),
                     "--length_required", "50",
-                    "--html", fastp_report_path],
-                stderr=fastp_log_path.open("w"))
+                    "--html", file_path(FASTP_DIR) / (fastq_file_name_1.replace("_1.fastq", "_trim_1_2.fastq")
+                                                      + "_report.html")],
+                stderr=(file_path(FASTP_DIR) / (fastq_file_name_1.replace("_1.fastq", "_trim_1_2.fastq")
+                                                + ".log")).open("w"))
 
         # Map the trimmed FASTQ files to the reference FASTA file
         # Convert the SAM file into BAM format
@@ -228,19 +217,17 @@ def main() -> None:
         # Index the sorted BAM file
         # Delete the unsorted BAM and SAM files
         if process_step(MAPPING_BWA):
-            fastq_file_path_trim_1 = fastp_dir / fastq_file_name_1.replace("_1.fastq", "_trim_1.fastq")
-            fastq_file_path_trim_2 = fastp_dir / fastq_file_name_2.replace("_2.fastq", "_trim_2.fastq")
-            sam_file_path = mapping_bwa_dir / fastq_file_name_1.replace("_1.fastq.gz", ".sam")
-            bam_file_path = mapping_bwa_dir / fastq_file_name_1.replace("_1.fastq.gz", ".bam")
-            sorted_bam_file_path = mapping_bwa_dir / fastq_file_name_1.replace("_1.fastq.gz", "_sorted.bam")
+            sam_file_path = file_path(MAPPING_BWA_DIR) / fastq_file_name_1.replace("_1.fastq.gz", ".sam")
+            bam_file_path = file_path(MAPPING_BWA_DIR) / fastq_file_name_1.replace("_1.fastq.gz", ".bam")
+            sorted_bam_file_path = file_path(MAPPING_BWA_DIR) / fastq_file_name_1.replace("_1.fastq.gz", "_sorted.bam")
             # Map the trimmed FASTQ files to the reference FASTA file
             run(
                 [
                     "bwa-mem2", "mem", "-M",
                     "-t", "8",
                     file_path(REFERENCE_FASTA_FILE),
-                    fastq_file_path_trim_1,
-                    fastq_file_path_trim_2],
+                    file_path(FASTP_DIR) / fastq_file_name_1.replace("_1.fastq", "_trim_1.fastq"),
+                    file_path(FASTP_DIR) / fastq_file_name_2.replace("_2.fastq", "_trim_2.fastq")],
                 stdout=sam_file_path.open("w"))
             # Convert the SAM file into BAM format
             run(
@@ -268,17 +255,14 @@ def main() -> None:
 
         # Create a mapping quality report
         if process_step(QUALIMAP_BAMQC):
-            sorted_bam_file_path = mapping_bwa_dir / fastq_file_name_1.replace("_1.fastq.gz", "_sorted.bam")
-            qualimap_out_dir = mapping_qc_dir / fastq_file_name_1.replace("_1.fastq.gz", "")
-            qualimap_out_filename = fastq_file_name_1.replace("_1.fastq.gz", ".pdf")
             run(
                 [
                     "qualimap", "bamqc",
                     "-nt", "8",
-                    "-bam", sorted_bam_file_path,
-                    "-outdir", qualimap_out_dir,
+                    "-bam", file_path(MAPPING_BWA_DIR) / fastq_file_name_1.replace("_1.fastq.gz", "_sorted.bam"),
+                    "-outdir", file_path(MAPPING_QC_DIR) / fastq_file_name_1.replace("_1.fastq.gz", ""),
                     "-outformat", "PDF:HTML",
-                    "-outfile", qualimap_out_filename])
+                    "-outfile", fastq_file_name_1.replace("_1.fastq.gz", ".pdf")])
 
     ###########################################################################
     # -- Step 4 - Create an overview mapping quality report for all processed
@@ -286,27 +270,20 @@ def main() -> None:
     ###########################################################################
 
     if process_step(QUALIMAP_MULTI_BAMQC):
-        input_groups_file_path = config.get("FilePaths", "input_groups_file", fallback=None)
-        if input_groups_file_path:
-            input_groups_file_path = Path(input_groups_file_path)
-        else:
+        if not file_path(INPUT_GROUPS_FILE):
             raise SystemExit("Error: input_groups_file not configured.")
-        if not input_groups_file_path.is_file():
-            raise SystemExit(f"Error: Required input groups file {input_groups_file_path} does not exist.")
+        if not file_path(INPUT_GROUPS_FILE).is_file():
+            raise SystemExit(f"Error: Required input groups file {file_path(INPUT_GROUPS_FILE)} does not exist.")
         qualimap_data_file_path = mapping_qc_dir / "input_groups.txt"
-        if (not qualimap_data_file_path.is_file()
-                or not input_groups_file_path.samefile(qualimap_data_file_path)):
-            shutil.copy(input_groups_file_path, qualimap_data_file_path)
-
-        qualimap_out_dir = mapping_qc_dir / "multibamqc"
-        qualimap_out_filename = "Overview-Report.pdf"
+        if not qualimap_data_file_path.is_file() or not file_path(INPUT_GROUPS_FILE).samefile(qualimap_data_file_path):
+            shutil.copy(file_path(INPUT_GROUPS_FILE), qualimap_data_file_path)
         run(
             [
                 "qualimap", "multi-bamqc",
                 "-d", qualimap_data_file_path,
-                "-outdir", qualimap_out_dir,
+                "-outdir", file_path(MAPPING_QC_DIR) / "multibamqc",
                 "-outformat", "PDF",
-                "-outfile", qualimap_out_filename])
+                "-outfile", "Overview-Report.pdf"])
 
     ###########################################################################
     # -- Elapsed time in nanoseconds
