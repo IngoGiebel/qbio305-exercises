@@ -126,82 +126,20 @@ def main() -> None:
     ###########################################################################
 
     # -- fastqc output dir
-    fastqc_dir = file_path(FASTQC_DIR)
     if process_step(FASTQC):
-        # Create the fastq directory if it does not already exist
-        # (only if configured)
-        if not fastqc_dir.is_dir():
-            if config.getboolean("Global", "create_output_dirs", fallback=False):
-                fastqc_dir.mkdir()
-            else:
-                raise SystemExit(f"Error: Required directory {fastqc_dir} does not exist.")
-        # Clear the fastq directory if not empty (only if configured)
-        if (config.getboolean("Global", "clear_output_dirs", fallback=False)
-                and any(fastqc_dir.iterdir())):
-            shutil.rmtree(fastqc_dir)
-            fastqc_dir.mkdir()
-
+        check_and_prepare_output_dir(file_path(FASTQC_DIR))
     # -- repair output dir
-    repair_dir = file_path(REPAIR_DIR)
     if process_step(REPAIR_FASTQ):
-        # Create the repair directory if it does not already exist (only if configured)
-        if not repair_dir.is_dir():
-            if config.getboolean("Global", "create_output_dirs", fallback=False):
-                repair_dir.mkdir()
-            else:
-                raise SystemExit(f"Error: Required directory {repair_dir} does not exist.")
-        # Clear the repair directory if not empty (only if configured)
-        if (config.getboolean("Global", "clear_output_dirs", fallback=False)
-                and any(repair_dir.iterdir())):
-            shutil.rmtree(repair_dir)
-            repair_dir.mkdir()
-
+        check_and_prepare_output_dir(file_path(REPAIR_DIR))
     # -- fastp output dir
-    fastp_dir = file_path(FASTP_DIR)
     if process_step(FASTP):
-        # Create the fastp directory if it does not already exist
-        # (only if configured)
-        if not fastp_dir.is_dir():
-            if config.getboolean("Global", "create_output_dirs", fallback=False):
-                fastp_dir.mkdir()
-            else:
-                raise SystemExit(f"Error: Required directory {fastp_dir} does not exist.")
-        # Clear the fastp directory if not empty (only if configured)
-        if (config.getboolean("Global", "clear_output_dirs", fallback=False)
-                and any(fastp_dir.iterdir())):
-            shutil.rmtree(fastp_dir)
-            fastp_dir.mkdir()
-
+        check_and_prepare_output_dir(file_path(FASTP_DIR))
     # -- mapping_bwa output dir
-    mapping_bwa_dir = file_path(MAPPING_BWA_DIR)
     if process_step(MAPPING_BWA):
-        # Create the mapping_bwa directory if it does not already exist
-        # (only if configured)
-        if not mapping_bwa_dir.is_dir():
-            if config.getboolean("Global", "create_output_dirs", fallback=False):
-                mapping_bwa_dir.mkdir()
-            else:
-                raise SystemExit(f"Error: Required directory {mapping_bwa_dir} does not exist.")
-        # Clear the mapping_bwa directory if not empty (only if configured)
-        if (config.getboolean("Global", "clear_output_dirs", fallback=False)
-                and any(mapping_bwa_dir.iterdir())):
-            shutil.rmtree(mapping_bwa_dir)
-            mapping_bwa_dir.mkdir()
-
+        check_and_prepare_output_dir(file_path(MAPPING_BWA_DIR))
     # -- mapping_qc output dir
-    mapping_qc_dir = file_path(MAPPING_QC_DIR)
     if process_step(QUALIMAP_BAMQC):
-        # Create the mapping_qc directory if it does not already exist (only if configured)
-        if not mapping_qc_dir.is_dir():
-            if config.getboolean("Global", "create_output_dirs", fallback=False):
-                mapping_qc_dir.mkdir()
-            else:
-                raise SystemExit(f"Error: Required directory {mapping_qc_dir} does not exist.")
-        # Clear the mapping_qc directory if not empty (only if configured)
-        if (config.getboolean("Global", "clear_output_dirs", fallback=False)
-                and any(mapping_qc_dir.iterdir())):
-            shutil.rmtree(mapping_qc_dir)
-            mapping_qc_dir.mkdir()
+        check_and_prepare_output_dir(file_path(MAPPING_QC_DIR))
 
     ###########################################################################
     # -- Step 3 - Processing chain of the raw FASTQ input files:
