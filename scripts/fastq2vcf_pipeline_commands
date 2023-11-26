@@ -6,26 +6,44 @@ from os.path import dirname
 from pathlib import Path
 from subprocess import run
 from time import perf_counter_ns
+from typing import Optional
 
 import shutil
 import sys
 
+FILE_PATHS_SECTION = "FilePaths"
+REFERENCE_FASTA_FILE = "reference_fasta_file"
+FASTQ_DIR = "fastq_dir"
+FASTQC_DIR = "fastqc_dir"
+REPAIR_DIR = "repair_dir"
+FASTP_DIR = "fastp_dir"
+MAPPING_BWA_DIR = "mapping_bwa_dir"
+MAPPING_QC_DIR = "mapping_qc_dir"
 
-def read_config(argv: list[str]) -> ConfigParser:
+config: ConfigParser = None
+
+
+def read_config():
     # The config file is either provided as the first script parameter,
     # or it is the file fastq2vcf_pipeline_commands.ini within the script
     # directory
-    if len(argv) > 1:
-        config_path = argv[1]
+    global config
+    if len(sys.argv) > 1:
+        config_path = sys.argv[1]
     else:
-        script_dir = Path(dirname(Path(argv[0]).resolve()))
+        script_dir = Path(dirname(Path(sys.argv[0]).resolve()))
         config_path = script_dir / "fastq2vcf_pipeline_commands.ini"
 
     # -- Read the config file
     config = ConfigParser(interpolation=ExtendedInterpolation())
     config.read(config_path)
 
-    return config
+
+def file_path(config_var: str) -> Optional[Path]:
+    p = config.get(FILE_PATHS_SECTION, config_var, fallback=None)
+    if p:
+        p = Path(p)
+    return p
 
 
 def main():
@@ -36,15 +54,13 @@ def main():
     # --  Step 0 - Read the config file
     ###########################################################################
 
-    config = read_config(sys.argv)
+    read_config()
 
     ###########################################################################
     # -- Step 1 - Index the FASTA reference file
     ###########################################################################
 
-    reference_fasta_path = config.get("FilePaths", "reference_fasta_file", fallback=None)
-    if reference_fasta_path:
-        reference_fasta_path = Path(reference_fasta_path)
+    reference_fasta_path = file_path(REFERENCE_FASTA_FILE)
     if config.getboolean("ProcessingSteps", "bwa_mem2_index_reference_fasta", fallback=False):
         run(["bwa-mem2", "index", reference_fasta_path])
 
@@ -52,9 +68,7 @@ def main():
     # -- Step 2 - Make a list of the raw FASTQ input files
     ###########################################################################
 
-    fastq_dir = config.get("FilePaths", "fastq_dir", fallback=None)
-    if fastq_dir:
-        fastq_dir = Path(fastq_dir)
+    fastq_dir = file_path(FASTQ_DIR)
     fastq_file_names: list[String] = []
     if (
             # Only if a processing step is configured which requires the list
@@ -66,7 +80,6 @@ def main():
             or config.getboolean("ProcessingSteps", "mapping_bwa", fallback=False)
             or config.getboolean("ProcessingSteps", "qualimap_bamqc", fallback=False)
             or config.getboolean("ProcessingSteps", "qualimap_multi_bamqc", fallback=False)):
-
         fastq_file_names = [
             (fastq_file_name_1.name, fastq_file_name_1.name.replace("_1.fastq", "_2.fastq"))
             for fastq_file_name_1 in fastq_dir.glob("*_1.fastq*")]
@@ -81,9 +94,7 @@ def main():
     ###########################################################################
 
     # -- fastqc output dir
-    fastqc_dir = config.get("FilePaths", "fastqc_dir", fallback=None)
-    if fastqc_dir:
-        fastqc_dir = Path(fastqc_dir)
+    fastqc_dir = file_path(FASTQC_DIR)
     if config.getboolean("ProcessingSteps", "fastqc", fallback=False):
         # Create the fastq directory if it does not already exist
         # (only if configured)
@@ -99,9 +110,7 @@ def main():
             fastqc_dir.mkdir()
 
     # -- repair output dir
-    repair_dir = config.get("FilePaths", "repair_dir", fallback=None)
-    if repair_dir:
-        repair_dir = Path(repair_dir)
+    repair_dir = file_path(REPAIR_DIR)
     if config.getboolean("ProcessingSteps", "repair_fastq", fallback=False):
         # Create the repair directory if it does not already exist (only if configured)
         if not repair_dir.is_dir():
@@ -116,9 +125,7 @@ def main():
             repair_dir.mkdir()
 
     # -- fastp output dir
-    fastp_dir = config.get("FilePaths", "fastp_dir", fallback=None)
-    if fastp_dir:
-        fastp_dir = Path(fastp_dir)
+    fastp_dir = file_path(FASTP_DIR)
     if config.getboolean("ProcessingSteps", "fastp", fallback=False):
         # Create the fastp directory if it does not already exist
         # (only if configured)
@@ -134,9 +141,7 @@ def main():
             fastp_dir.mkdir()
 
     # -- mapping_bwa output dir
-    mapping_bwa_dir = config.get("FilePaths", "mapping_bwa_dir", fallback=None)
-    if mapping_bwa_dir:
-        mapping_bwa_dir = Path(mapping_bwa_dir)
+    mapping_bwa_dir = file_path(MAPPING_BWA_DIR)
     if config.getboolean("ProcessingSteps", "mapping_bwa", fallback=False):
         # Create the mapping_bwa directory if it does not already exist
         # (only if configured)
@@ -152,9 +157,7 @@ def main():
             mapping_bwa_dir.mkdir()
 
     # -- mapping_qc output dir
-    mapping_qc_dir = config.get("FilePaths", "mapping_qc_dir", fallback=None)
-    if mapping_qc_dir:
-        mapping_qc_dir = Path(mapping_qc_dir)
+    mapping_qc_dir = file_path(MAPPING_QC_DIR)
     if config.getboolean("ProcessingSteps", "qualimap_bamqc", fallback=False):
         # Create the mapping_qc directory if it does not already exist (only if configured)
         if not mapping_qc_dir.is_dir():
@@ -322,7 +325,6 @@ def main():
         qualimap_data_file_path = mapping_qc_dir / "input_groups.txt"
         if (not qualimap_data_file_path.is_file()
                 or not input_groups_file_path.samefile(qualimap_data_file_path)):
-
             shutil.copy(input_groups_file_path, qualimap_data_file_path)
 
         qualimap_out_dir = mapping_qc_dir / "multibamqc"
