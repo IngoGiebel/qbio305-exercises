@@ -9,8 +9,23 @@ from time import perf_counter_ns
 
 import shutil
 import sys
-from typing import Any
-from typing import List
+
+
+def read_config(argv: list[str]) -> ConfigParser:
+    # The config file is either provided as the first script parameter,
+    # or it is the file fastq2vcf_pipeline_commands.ini within the script
+    # directory
+    if len(argv) > 1:
+        config_path = argv[1]
+    else:
+        script_dir = Path(dirname(Path(argv[0]).resolve()))
+        config_path = script_dir / "fastq2vcf_pipeline_commands.ini"
+
+    # -- Read the config file
+    config = ConfigParser(interpolation=ExtendedInterpolation())
+    config.read(config_path)
+
+    return config
 
 
 def main():
@@ -21,21 +36,7 @@ def main():
     # --  Step 0 - Read the config file
     ###########################################################################
 
-    # -- Determine the script directory path
-    script_dir = Path(dirname(Path(sys.argv[0]).resolve()))
-
-    # -- Determine the file path of the config file
-    # The config file is either provided as the first script parameter,
-    # or it is the file fastq2vcf_pipeline_commands.ini within the script
-    # directory
-    if len(sys.argv) > 1:
-        config_path = sys.argv[1]
-    else:
-        config_path = script_dir / "fastq2vcf_pipeline_commands.ini"
-
-    # -- Read the config file
-    config = ConfigParser(interpolation=ExtendedInterpolation())
-    config.read(config_path)
+    config = read_config(sys.argv)
 
     ###########################################################################
     # -- Step 1 - Index the FASTA reference file
@@ -74,7 +75,7 @@ def main():
 
     ###########################################################################
     # -- Step 3 - Check and prepare all required output directories:
-    ###
+    ###########################################################################
     # -- Create output directories if necessary and configured.
     # -- Clear output directories if configured.
     ###########################################################################
