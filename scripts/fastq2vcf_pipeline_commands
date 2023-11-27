@@ -2,12 +2,14 @@
 
 from configparser import ConfigParser
 from configparser import ExtendedInterpolation
+from dataclasses import dataclass
 from os.path import dirname
 from pathlib import Path
 from subprocess import run
 from time import perf_counter_ns
 from typing import Optional
 # Required for type hinting prior to Python 3.9
+from typing import Dict
 from typing import List
 from typing import Tuple
 
@@ -70,12 +72,12 @@ def read_config() -> ConfigParser:
 CONFIG: ConfigParser = read_config()
 
 
-def process_step(config_var: str) -> bool:
-    return CONFIG.getboolean(PROCESSING_STEPS_SECTION, config_var, fallback=False)
+def process_step(config_key: str) -> bool:
+    return CONFIG.getboolean(PROCESSING_STEPS_SECTION, config_key, fallback=False)
 
 
-def file_path(config_var: str) -> Optional[Path]:
-    p = CONFIG.get(FILE_PATHS_SECTION, config_var, fallback=None)
+def file_path(config_key: str) -> Optional[Path]:
+    p = CONFIG.get(FILE_PATHS_SECTION, config_key, fallback=None)
     if p:
         p = Path(p)
     return p
@@ -100,6 +102,55 @@ def get_fastq_file_names() -> List[Tuple[str, str]]:
             for fastq_file_name_1 in sorted(file_path(FASTQ_DIR).glob("*_1.fastq*"))]
 
     return fastq_file_names
+
+
+###########################################################################
+# --  Dictionary of the input and output file paths
+###########################################################################
+
+@dataclass
+class InOutFilePaths:
+    raw1: Optional[Path] = None
+    raw2: Optional[Path] = None
+    fixed1: Optional[Path] = None
+    fixed2: Optional[Path] = None
+    fixedsingleton: Optional[Path] = None
+    trim1: Optional[Path] = None
+    trim2: Optional[Path] = None
+    sam: Optional[Path] = None
+    bam: Optional[Path] = None
+    sorted_bam: Optional[Path] = None
+    mapping_qc_outdir: Optional[Path] = None
+
+
+inout_filepaths_dict: Dict[InOutFilePaths] = {}
+
+
+def inout_filepaths(fastq1: str) -> InOutFilePaths:
+    inout_filepaths = inout_filepaths_dict.get(fastq1)
+
+    if not inout_filepaths:
+        # Create a new dictionary entry for that FASTQ file
+        fastq2 = fastq1.replace("_1.fastq", "_2.fastq")
+        inout_filepaths = InOutFilePaths()
+        if file_path(FASTQ_DIR):
+            inout_filepaths.raw1 = file_path(FASTQ_DIR) / fastq1
+            inout_filepaths.raw2 = file_path(FASTQ_DIR) / fastq2
+        if file_path(REPAIR_DIR):
+            inout_filepaths.fixed1 = file_path(REPAIR_DIR) / fastq1.replace("_1.fastq", "_fixed_1.fastq")
+            inout_filepaths.fixed2 = file_path(REPAIR_DIR) / fastq2.replace("_2.fastq", "_fixed_2.fastq")
+            inout_filepaths.fixedsingleton = file_path(REPAIR_DIR) / fastq1.replace("_1.fastq", "_singletons.fastq")
+        if file_path(FASTP_DIR):
+            inout_filepaths.trim1 = file_path(FASTP_DIR) / fastq1.replace("_1.fastq", "_trim_1.fastq")
+            inout_filepaths.trim2 = file_path(FASTP_DIR) / fastq2.replace("_2.fastq", "_trim_2.fastq")
+        if file_path(MAPPING_BWA_DIR):
+            inout_filepaths.sam = file_path(MAPPING_BWA_DIR) / fastq1.replace("_1.fastq.gz", ".sam")
+            inout_filepaths.bam = file_path(MAPPING_BWA_DIR) / fastq1.replace("_1.fastq.gz", ".bam")
+            inout_filepaths.sorted_bam = file_path(MAPPING_BWA_DIR) / fastq1.replace("_1.fastq.gz", "_sorted.bam")
+        if file_path(MAPPING_QC_DIR):
+            inout_filepaths.mapping_qc_outdir = file_path(MAPPING_QC_DIR) / fastq1.replace("_1.fastq.gz", "")
+
+    return inout_filepaths
 
 
 ###########################################################################
