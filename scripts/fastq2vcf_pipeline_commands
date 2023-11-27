@@ -12,6 +12,10 @@ import shutil
 import sys
 
 
+###########################################################################
+# --  Configuration file sections and keys
+###########################################################################
+
 # Global parameters
 GLOBAL_SECTION = "Global"
 CREATE_OUTPUT_DIRS = "create_output_dirs"
@@ -38,19 +42,15 @@ MAPPING_BWA_DIR = "mapping_bwa_dir"
 MAPPING_QC_DIR = "mapping_qc_dir"
 INPUT_GROUPS_FILE = "input_groups_file"
 
-# Configuration parameters
-config: ConfigParser = None
-
-# List of the raw FASTQ input files
-# Use the get_fastq_file_names() for accessing this list.
-fastq_file_names: Optional[list[str]] = None
+###########################################################################
+# --  Configuration parameters
+###########################################################################
 
 
-def read_config() -> None:
+def read_config() -> ConfigParser:
     # The config file is either provided as the first script parameter,
     # or it is the file fastq2vcf_pipeline_commands.ini within the script
     # directory
-    global config
     if len(sys.argv) > 1:
         config_path = sys.argv[1]
     else:
@@ -61,13 +61,23 @@ def read_config() -> None:
     config = ConfigParser(interpolation=ExtendedInterpolation())
     config.read(config_path)
 
+    return config
+
+
+CONFIG: ConfigParser = read_config()
+
+
+# List of the raw FASTQ input files
+# Use the get_fastq_file_names() for accessing this list.
+fastq_file_names: Optional[list[str]] = None
+
 
 def process_step(config_var: str) -> bool:
-    return config.getboolean(PROCESSING_STEPS_SECTION, config_var, fallback=False)
+    return CONFIG.getboolean(PROCESSING_STEPS_SECTION, config_var, fallback=False)
 
 
 def file_path(config_var: str) -> Optional[Path]:
-    p = config.get(FILE_PATHS_SECTION, config_var, fallback=None)
+    p = CONFIG.get(FILE_PATHS_SECTION, config_var, fallback=None)
     if p:
         p = Path(p)
     return p
@@ -88,12 +98,12 @@ def get_fastq_file_names() -> list[str]:
 def check_and_prepare_output_dir(output_dir: Path) -> None:
     # Create the directory if it does not already exist (only if configured)
     if not output_dir.is_dir():
-        if config.getboolean(GLOBAL_SECTION, CREATE_OUTPUT_DIRS, fallback=False):
+        if CONFIG.getboolean(GLOBAL_SECTION, CREATE_OUTPUT_DIRS, fallback=False):
             output_dir.mkdir()
         else:
             raise SystemExit(f"Error: Required directory {output_dir} does not exist.")
     # Clear the directory if not empty (only if configured)
-    if config.getboolean(GLOBAL_SECTION, CLEAR_OUTPUT_DIRS, fallback=False) and any(output_dir.iterdir()):
+    if CONFIG.getboolean(GLOBAL_SECTION, CLEAR_OUTPUT_DIRS, fallback=False) and any(output_dir.iterdir()):
         shutil.rmtree(output_dir)
         output_dir.mkdir()
 
@@ -211,12 +221,6 @@ def qualimap_multi_bamqc() -> None:
 def main() -> None:
     # Measure the elapsed time in nanoseconds - Start
     time_start = perf_counter_ns()
-
-    ###########################################################################
-    # --  Step 0 - Read the config file
-    ###########################################################################
-
-    read_config()
 
     ###########################################################################
     # -- Step 1 - Index the FASTA reference file
