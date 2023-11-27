@@ -84,10 +84,10 @@ def file_path(config_var: str) -> Optional[Path]:
 
 # List of the raw FASTQ input files
 # Use the get_fastq_file_names() for accessing this list.
-fastq_file_names: Optional[list[str]] = None
+fastq_file_names: Optional[list[tuple[str, str]]] = None
 
 
-def get_fastq_file_names() -> list[str]:
+def get_fastq_file_names() -> list[tuple[str, str]]:
     # TODO check that the second file in each tuple actually exists
     #  and is a file
     global fastq_file_names
