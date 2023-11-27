@@ -17,3 +17,5 @@ S
 ,.idea/inspectionProfiles/Project_Default.xml,4\9\496a238a6afa168dbaf6efd37bb459331589579c
 O
 fastq2vcf_pipeline_commands.ini,9\d\9d1a0423b2b5562022e26942bfdfa8c7c1b94ad9
+U
+%sbatch_fastq2vcf_pipeline_commands.sh,c\d\cdb7100fb82687cbdd03a042b0181254e74174fb

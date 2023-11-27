@@ -8,11 +8,9 @@
 #SBATCH --output=/home/group.kurse/%u/fastq2vcf_pipeline_commands-%j.out
 #SBATCH --error=/home/group.kurse/%u/fastq2vcf_pipeline_commands-%j.err
 
-cd $HOME
-
-module load python/3.8.7
+module load python
 module load fastqc
-module load bwamem2/2.2.1
-module load samtools/1.13
+module load bwamem2
+module load samtools
 
-fastq2vcf_pipeline_commands $@
+fastq2vcf_pipeline_commands "$@"

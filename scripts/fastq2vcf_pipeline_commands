@@ -283,14 +283,7 @@ def main() -> None:
     time_start = perf_counter_ns()
 
     ###########################################################################
-    # -- Step 1 - Index the FASTA reference file
-    ###########################################################################
-
-    if process_step(BWA_MEM2_INDEX_REFERENCE_FASTA):
-        bwa_mem2_index_reference_fasta()
-
-    ###########################################################################
-    # -- Step 2 - Check and prepare all required output directories
+    # -- Step 0 - Check and prepare all required output directories
     ###########################################################################
 
     # Create output directories if necessary and configured
@@ -298,7 +291,14 @@ def main() -> None:
     check_and_prepare_output_dirs()
 
     ###########################################################################
-    # -- Step 3 - Processing chain of the raw FASTQ input files
+    # -- Step 1 - Index the FASTA reference file
+    ###########################################################################
+
+    if process_step(BWA_MEM2_INDEX_REFERENCE_FASTA):
+        bwa_mem2_index_reference_fasta()
+
+    ###########################################################################
+    # -- Step 2 - Processing chain of the raw FASTQ input files
     # --          Loop over all raw FASTQ input files
     ###########################################################################
 
@@ -332,7 +332,7 @@ def main() -> None:
             qualimap_bamqc(fastq1)
 
     ###########################################################################
-    # -- Step 4 - Create an overview mapping quality report for all processed
+    # -- Step 3 - Create an overview mapping quality report for all processed
     # --          FASTQ files
     ###########################################################################
 
