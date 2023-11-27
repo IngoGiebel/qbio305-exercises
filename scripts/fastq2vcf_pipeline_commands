@@ -13,7 +13,7 @@ import sys
 
 
 ###########################################################################
-# --  Configuration file sections and keys
+# --  Configuration - file sections and keys
 ###########################################################################
 
 # Global parameters
@@ -42,10 +42,10 @@ MAPPING_BWA_DIR = "mapping_bwa_dir"
 MAPPING_QC_DIR = "mapping_qc_dir"
 INPUT_GROUPS_FILE = "input_groups_file"
 
-###########################################################################
-# --  Configuration parameters
-###########################################################################
 
+###########################################################################
+# --  Configuration - parameters
+###########################################################################
 
 def read_config() -> ConfigParser:
     # The config file is either provided as the first script parameter,
@@ -67,11 +67,6 @@ def read_config() -> ConfigParser:
 CONFIG: ConfigParser = read_config()
 
 
-# List of the raw FASTQ input files
-# Use the get_fastq_file_names() for accessing this list.
-fastq_file_names: Optional[list[str]] = None
-
-
 def process_step(config_var: str) -> bool:
     return CONFIG.getboolean(PROCESSING_STEPS_SECTION, config_var, fallback=False)
 
@@ -81,6 +76,15 @@ def file_path(config_var: str) -> Optional[Path]:
     if p:
         p = Path(p)
     return p
+
+
+###########################################################################
+# --  List of the raw FASTQ input files
+###########################################################################
+
+# List of the raw FASTQ input files
+# Use the get_fastq_file_names() for accessing this list.
+fastq_file_names: Optional[list[str]] = None
 
 
 def get_fastq_file_names() -> list[str]:
@@ -94,6 +98,10 @@ def get_fastq_file_names() -> list[str]:
 
     return fastq_file_names
 
+
+###########################################################################
+# --  Initial preparation of the output directories
+###########################################################################
 
 def check_and_prepare_output_dir(output_dir: Path) -> None:
     # Create the directory if it does not already exist (only if configured)
@@ -120,6 +128,10 @@ def check_and_prepare_output_dirs() -> None:
     if process_step(QUALIMAP_BAMQC):
         check_and_prepare_output_dir(file_path(MAPPING_QC_DIR))
 
+
+###########################################################################
+# --  Data processing functions
+###########################################################################
 
 def bwa_mem2_index_reference_fasta() -> None:
     run(["bwa-mem2", "index", file_path(REFERENCE_FASTA_FILE)])
@@ -217,6 +229,10 @@ def qualimap_multi_bamqc() -> None:
         "-outformat", "PDF",
         "-outfile", "Overview-Report.pdf"])
 
+
+###########################################################################
+# -- Main()
+###########################################################################
 
 def main() -> None:
     # Measure the elapsed time in nanoseconds - Start
