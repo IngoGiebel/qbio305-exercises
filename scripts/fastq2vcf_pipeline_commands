@@ -11,8 +11,8 @@ from typing import Optional
 # Required for type hinting prior to Python 3.9
 from typing import Dict
 from typing import List
-from typing import Tuple
 
+import re
 import shutil
 import sys
 
@@ -61,11 +61,9 @@ def read_config() -> ConfigParser:
     else:
         script_dir = Path(dirname(Path(sys.argv[0]).resolve()))
         config_path = script_dir / "fastq2vcf_pipeline_commands.ini"
-
     # -- Read the config file
     config = ConfigParser(interpolation=ExtendedInterpolation())
     config.read(config_path)
-
     return config
 
 
@@ -89,18 +87,13 @@ def file_path(config_key: str) -> Optional[Path]:
 
 # List of the raw FASTQ input files
 # Use the get_fastq_file_names() for accessing this list.
-fastq_file_names: Optional[List[Tuple[str, str]]] = None
+fastq_file_names: Optional[List[str]] = None
 
 
-def get_fastq_file_names() -> List[Tuple[str, str]]:
-    # TODO check that the second file in each tuple actually exists
-    #  and is a file
+def get_fastq_file_names() -> List[str]:
     global fastq_file_names
     if not fastq_file_names:
-        fastq_file_names = [
-            (fastq_file_name_1.name, fastq_file_name_1.name.replace("_1.fastq", "_2.fastq"))
-            for fastq_file_name_1 in sorted(file_path(FASTQ_DIR).glob("*_1.fastq*"))]
-
+        fastq_file_names = [fastq1.name for fastq1 in sorted(file_path(FASTQ_DIR).glob("*_1.fastq*"))]
     return fastq_file_names
 
 
@@ -109,7 +102,7 @@ def get_fastq_file_names() -> List[Tuple[str, str]]:
 ###########################################################################
 
 @dataclass
-class InOutFilePaths:
+class IOFilePaths:
     raw1: Optional[Path] = None
     raw2: Optional[Path] = None
     fixed1: Optional[Path] = None
@@ -117,40 +110,42 @@ class InOutFilePaths:
     fixedsingleton: Optional[Path] = None
     trim1: Optional[Path] = None
     trim2: Optional[Path] = None
+    trim_report: Optional[Path] = None
+    trim_log: Optional[Path] = None
     sam: Optional[Path] = None
     bam: Optional[Path] = None
     sorted_bam: Optional[Path] = None
     mapping_qc_outdir: Optional[Path] = None
 
 
-inout_filepaths_dict: Dict[InOutFilePaths] = {}
+iofilepaths_dict: Dict[str, IOFilePaths] = {}
 
 
-def inout_filepaths(fastq1: str) -> InOutFilePaths:
-    inout_filepaths = inout_filepaths_dict.get(fastq1)
-
-    if not inout_filepaths:
+def iofilepaths(fastq1: str) -> IOFilePaths:
+    iofilepaths = iofilepaths_dict.get(fastq1)
+    if not iofilepaths:
         # Create a new dictionary entry for that FASTQ file
         fastq2 = fastq1.replace("_1.fastq", "_2.fastq")
-        inout_filepaths = InOutFilePaths()
+        iofilepaths = IOFilePaths()
         if file_path(FASTQ_DIR):
-            inout_filepaths.raw1 = file_path(FASTQ_DIR) / fastq1
-            inout_filepaths.raw2 = file_path(FASTQ_DIR) / fastq2
+            iofilepaths.raw1 = file_path(FASTQ_DIR) / fastq1
+            iofilepaths.raw2 = file_path(FASTQ_DIR) / fastq2
         if file_path(REPAIR_DIR):
-            inout_filepaths.fixed1 = file_path(REPAIR_DIR) / fastq1.replace("_1.fastq", "_fixed_1.fastq")
-            inout_filepaths.fixed2 = file_path(REPAIR_DIR) / fastq2.replace("_2.fastq", "_fixed_2.fastq")
-            inout_filepaths.fixedsingleton = file_path(REPAIR_DIR) / fastq1.replace("_1.fastq", "_singletons.fastq")
+            iofilepaths.fixed1 = file_path(REPAIR_DIR) / fastq1.replace("_1.fastq", "_fixed_1.fastq")
+            iofilepaths.fixed2 = file_path(REPAIR_DIR) / fastq2.replace("_2.fastq", "_fixed_2.fastq")
+            iofilepaths.fixedsingleton = file_path(REPAIR_DIR) / fastq1.replace("_1.fastq", "_singletons.fastq")
         if file_path(FASTP_DIR):
-            inout_filepaths.trim1 = file_path(FASTP_DIR) / fastq1.replace("_1.fastq", "_trim_1.fastq")
-            inout_filepaths.trim2 = file_path(FASTP_DIR) / fastq2.replace("_2.fastq", "_trim_2.fastq")
+            iofilepaths.trim1 = file_path(FASTP_DIR) / fastq1.replace("_1.fastq", "_trim_1.fastq")
+            iofilepaths.trim2 = file_path(FASTP_DIR) / fastq2.replace("_2.fastq", "_trim_2.fastq")
+            iofilepaths.trim_report = file_path(FASTP_DIR) / re.sub("_1.fastq.*", "_trim_report.html", fastq1)
+            iofilepaths.trim_log = file_path(FASTP_DIR) / re.sub("_1.fastq.*", "_trim.log", fastq1)
         if file_path(MAPPING_BWA_DIR):
-            inout_filepaths.sam = file_path(MAPPING_BWA_DIR) / fastq1.replace("_1.fastq.gz", ".sam")
-            inout_filepaths.bam = file_path(MAPPING_BWA_DIR) / fastq1.replace("_1.fastq.gz", ".bam")
-            inout_filepaths.sorted_bam = file_path(MAPPING_BWA_DIR) / fastq1.replace("_1.fastq.gz", "_sorted.bam")
+            iofilepaths.sam = file_path(MAPPING_BWA_DIR) / re.sub("_1.fastq.*", ".sam", fastq1)
+            iofilepaths.bam = file_path(MAPPING_BWA_DIR) / re.sub("_1.fastq.*", ".bam", fastq1)
+            iofilepaths.sorted_bam = file_path(MAPPING_BWA_DIR) / re.sub("_1.fastq.*", "_sorted.bam", fastq1)
         if file_path(MAPPING_QC_DIR):
-            inout_filepaths.mapping_qc_outdir = file_path(MAPPING_QC_DIR) / fastq1.replace("_1.fastq.gz", "")
-
-    return inout_filepaths
+            iofilepaths.mapping_qc_outdir = file_path(MAPPING_QC_DIR) / fastq1.replace("_1.fastq.gz", "")
+    return iofilepaths
 
 
 ###########################################################################
@@ -191,81 +186,76 @@ def bwa_mem2_index_reference_fasta() -> None:
     run(["bwa-mem2", "index", file_path(REFERENCE_FASTA_FILE)])
 
 
-def fastqc(f1: str, f2: str) -> None:
+def fastqc(fastq1: str) -> None:
     run([
         "fastqc",
         "--threads", "8",
         "-o", file_path(FASTQC_DIR),
-        file_path(FASTQ_DIR) / f1,
-        file_path(FASTQ_DIR) / f2])
+        iofilepaths(fastq1).raw1,
+        iofilepaths(fastq1).raw2])
 
 
-def repair_fastq(f1: str, f2: str) -> None:
+def repair_fastq(fastq1: str) -> None:
     run([
         "repair.sh",
         "overwrite=true",
-        "in1=" + str(file_path(FASTQ_DIR) / f1),
-        "in2=" + str(file_path(FASTQ_DIR) / f2),
-        "out1=" + str(file_path(REPAIR_DIR) / f1.replace("_1.fastq", "_fixed_1.fastq")),
-        "out2=" + str(file_path(REPAIR_DIR) / f2.replace("_2.fastq", "_fixed_2.fastq")),
-        "outsingle=" + str(file_path(REPAIR_DIR) / f1.replace("_1.fastq", "_singletons.fastq"))])
+        "in1=" + str(iofilepaths(fastq1).raw1),
+        "in2=" + str(iofilepaths(fastq1).raw2),
+        "out1=" + str(iofilepaths(fastq1).fixed1),
+        "out2=" + str(iofilepaths(fastq1).fixed2),
+        "outsingle=" + str(iofilepaths(fastq1).fixedsingleton)])
 
 
-def fastp(f1: str, f2: str) -> None:
+def fastp(fastq1: str) -> None:
     run([
         "fastp",
         "--thread", "8",
-        "--in1", str(file_path(REPAIR_DIR) / f1.replace("_1.fastq", "_fixed_1.fastq")),
-        "--in2", str(file_path(REPAIR_DIR) / f2.replace("_2.fastq", "_fixed_2.fastq")),
-        "--out1", str(file_path(FASTP_DIR) / f1.replace("_1.fastq", "_trim_1.fastq")),
-        "--out2", str(file_path(FASTP_DIR) / f2.replace("_2.fastq", "_trim_2.fastq")),
+        "--in1", iofilepaths(fastq1).fixed1,
+        "--in2", iofilepaths(fastq1).fixed2,
+        "--out1", iofilepaths(fastq1).trim1,
+        "--out2", iofilepaths(fastq1).trim2,
         "--length_required", "50",
-        "--html", file_path(FASTP_DIR) / (f1.replace("_1.fastq", "_trim_1_2.fastq") + "_report.html")],
-        stderr=(file_path(FASTP_DIR) / (f1.replace("_1.fastq", "_trim_1_2.fastq") + ".log")).open("w"))
+        "--html", iofilepaths(fastq1).trim_report],
+        stderr=iofilepaths(fastq1).trim_log.open("w"))
 
 
-def map_bwa(f1: str, f2: str) -> None:
-    sam_file_path = file_path(MAPPING_BWA_DIR) / f1.replace("_1.fastq.gz", ".sam")
-    bam_file_path = file_path(MAPPING_BWA_DIR) / f1.replace("_1.fastq.gz", ".bam")
-    sorted_bam_file_path = file_path(MAPPING_BWA_DIR) / f1.replace("_1.fastq.gz", "_sorted.bam")
+def map_bwa(fastq1: str) -> None:
     # Map the trimmed FASTQ files to the reference FASTA file
     run([
         "bwa-mem2", "mem", "-M",
         "-t", "8",
         file_path(REFERENCE_FASTA_FILE),
-        file_path(FASTP_DIR) / f1.replace("_1.fastq", "_trim_1.fastq"),
-        file_path(FASTP_DIR) / f2.replace("_2.fastq", "_trim_2.fastq")],
-        stdout=sam_file_path.open("w"))
+        iofilepaths(fastq1).trim1,
+        iofilepaths(fastq1).trim2],
+        stdout=iofilepaths(fastq1).sam.open("w"))
     # Convert the SAM file into BAM format
     run([
         "samtools", "view", "--bam", "-S",
         "--threads", "8",
-        sam_file_path],
-        stdout=bam_file_path.open("w"))
+        iofilepaths(fastq1).sam],
+        stdout=iofilepaths(fastq1).bam.open("w"))
     # Sort the BAM file
     run([
         "samtools", "sort",
         "--threads", "8",
-        "-o", sorted_bam_file_path,
-        bam_file_path])
+        "-o", iofilepaths(fastq1).sorted_bam,
+        iofilepaths(fastq1).bam])
     # Index the sorted BAM file
     run([
         "samtools", "index",
         "--threads", "8",
-        sorted_bam_file_path])
+        iofilepaths(fastq1).sorted_bam])
     # Delete the unsorted BAM and SAM files
-    sam_file_path.unlink()
-    bam_file_path.unlink()
+    iofilepaths(fastq1).sam.unlink()
+    iofilepaths(fastq1).bam.unlink()
 
 
-def qualimap_bamqc(f1: str) -> None:
+def qualimap_bamqc(fastq1: str) -> None:
     run([
         "qualimap", "bamqc",
         "-nt", "8",
-        "-bam", file_path(MAPPING_BWA_DIR) / f1.replace("_1.fastq.gz", "_sorted.bam"),
-        "-outdir", file_path(MAPPING_QC_DIR) / f1.replace("_1.fastq.gz", ""),
-        "-outformat", "PDF:HTML",
-        "-outfile", f1.replace("_1.fastq.gz", ".pdf")])
+        "-bam", iofilepaths(fastq1).sorted_bam,
+        "-outdir", iofilepaths(fastq1).mapping_qc_outdir])
 
 
 def qualimap_multi_bamqc() -> None:
@@ -312,19 +302,19 @@ def main() -> None:
     # --          Loop over all raw FASTQ input files
     ###########################################################################
 
-    for fastq_file_name_1, fastq_file_name_2 in get_fastq_file_names():
+    for fastq1 in get_fastq_file_names():
         # Create fastqc quality reports of the raw FASTQ input files
         # -> fastqc
         if process_step(FASTQC):
-            fastqc(fastq_file_name_1, fastq_file_name_2)
+            fastqc(fastq1)
         # Repair the raw FASTQ input files
         # -> repair.sh
         if process_step(REPAIR_FASTQ):
-            repair_fastq(fastq_file_name_1, fastq_file_name_2)
+            repair_fastq(fastq1)
         # Perform quality trimming of the raw/repaired FASTQ reads
         # -> fastp
         if process_step(FASTP):
-            fastp(fastq_file_name_1, fastq_file_name_2)
+            fastp(fastq1)
         # Map the trimmed FASTQ files to the reference FASTA file
         # -> bwa-mem2 mem
         # Convert the SAM file into BAM format
@@ -335,11 +325,11 @@ def main() -> None:
         # -> samtools index
         # Delete the unsorted BAM and SAM files
         if process_step(MAPPING_BWA):
-            map_bwa(fastq_file_name_1, fastq_file_name_2)
+            map_bwa(fastq1)
         # Create a mapping quality report
         # -> qualimap bamqc
         if process_step(QUALIMAP_BAMQC):
-            qualimap_bamqc(fastq_file_name_1)
+            qualimap_bamqc(fastq1)
 
     ###########################################################################
     # -- Step 4 - Create an overview mapping quality report for all processed
