@@ -19,3 +19,8 @@ O
 fastq2vcf_pipeline_commands.ini,9\d\9d1a0423b2b5562022e26942bfdfa8c7c1b94ad9
 U
 %sbatch_fastq2vcf_pipeline_commands.sh,c\d\cdb7100fb82687cbdd03a042b0181254e74174fb
+X
+(sbatch_fastq2vcf_pipeline_commands_03.sh,a\6\a67e72c61fa47fa3640d079a70ce9fed4b07f38c
+:
+
+README.txt,f\d\fda3484edf8db0684440157ce0b110d784d42704

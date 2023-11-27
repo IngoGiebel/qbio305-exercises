@@ -13,4 +13,12 @@ module load fastqc
 module load bwamem2
 module load samtools
 
+# module unload bwamem2
+# module unload gnu
+# module load bcftools
+
+# module unload bcftools
+# module unload gnu
+# module load vcftools
+
 fastq2vcf_pipeline_commands "$@"

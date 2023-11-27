@@ -41,8 +41,8 @@ Required external programs (must be executable and located within the $PATH envi
 
 sbatch_fastq2vcf_pipeline_commands.sh is the master shell script which encapsulates
 the specifics of the sbatch execution. This script loads the required modules
-within the cheops1 environment (module load fastqc, module load bwamem2/2.2.1,
-module load samtools/1.13) and invokes the other python shell script
+within the cheops1 environment (module load fastqc, module load bwamem2,
+module load samtools) and invokes the other python shell script
 fastq2vcf_pipeline_commands which does the actual work. Both scripts need
 to have execution privileges, and both scripts need to be located within the
 $PATH environment variable.
