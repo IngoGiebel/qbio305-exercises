@@ -7,6 +7,9 @@ from pathlib import Path
 from subprocess import run
 from time import perf_counter_ns
 from typing import Optional
+# Required for type hinting prior to Python 3.9
+from typing import List
+from typing import Tuple
 
 import shutil
 import sys
@@ -84,17 +87,17 @@ def file_path(config_var: str) -> Optional[Path]:
 
 # List of the raw FASTQ input files
 # Use the get_fastq_file_names() for accessing this list.
-fastq_file_names: Optional[list[tuple[str, str]]] = None
+fastq_file_names: Optional[List[Tuple[str, str]]] = None
 
 
-def get_fastq_file_names() -> list[tuple[str, str]]:
+def get_fastq_file_names() -> List[Tuple[str, str]]:
     # TODO check that the second file in each tuple actually exists
     #  and is a file
     global fastq_file_names
     if not fastq_file_names:
         fastq_file_names = [
             (fastq_file_name_1.name, fastq_file_name_1.name.replace("_1.fastq", "_2.fastq"))
-            for fastq_file_name_1 in file_path(FASTQ_DIR).glob("*_1.fastq*")]
+            for fastq_file_name_1 in sorted(file_path(FASTQ_DIR).glob("*_1.fastq*"))]
 
     return fastq_file_names
 
