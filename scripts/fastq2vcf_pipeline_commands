@@ -246,62 +246,44 @@ def main() -> None:
         bwa_mem2_index_reference_fasta()
 
     ###########################################################################
-    # -- Step 2 - Check and prepare all required output directories:
-    ###########################################################################
-    # -- Create output directories if necessary and configured.
-    # -- Clear output directories if configured.
+    # -- Step 2 - Check and prepare all required output directories
     ###########################################################################
 
+    # Create output directories if necessary and configured
+    # Clear output directories if configured
     check_and_prepare_output_dirs()
 
     ###########################################################################
-    # -- Step 3 - Processing chain of the raw FASTQ input files:
-    ###########################################################################
-    # -- Create fastqc quality reports of the raw FASTQ input files
-    # -- -> fastqc
-    # -- ----------------------------------------------------------------------
-    # -- Repair the raw FASTQ input files
-    # -- -> repair.sh
-    # -- ----------------------------------------------------------------------
-    # -- Perform quality trimming of the raw/repaired FASTQ reads
-    # -- -> fastp
-    # -- ----------------------------------------------------------------------
-    # -- Map the trimmed FASTQ files to the reference FASTA file
-    # -- -> bwa-mem2 mem
-    # -- ----------------------------------------------------------------------
-    # -- Convert the SAM file into BAM format
-    # -- -> samtools view
-    # -- ----------------------------------------------------------------------
-    # -- Sort the BAM file
-    # -- -> samtools sort
-    # -- ----------------------------------------------------------------------
-    # -- Index the sorted BAM file
-    # -- -> samtools index
-    # -- ----------------------------------------------------------------------
-    # -- Delete the unsorted BAM and SAM files
-    # -- ----------------------------------------------------------------------
-    # -- Create a mapping quality report
-    # -- -> qualimap bamqc
+    # -- Step 3 - Processing chain of the raw FASTQ input files
+    # --          Loop over all raw FASTQ input files
     ###########################################################################
 
     for fastq_file_name_1, fastq_file_name_2 in get_fastq_file_names():
         # Create fastqc quality reports of the raw FASTQ input files
+        # -> fastqc
         if process_step(FASTQC):
             fastqc(fastq_file_name_1, fastq_file_name_2)
         # Repair the raw FASTQ input files
+        # -> repair.sh
         if process_step(REPAIR_FASTQ):
             repair_fastq(fastq_file_name_1, fastq_file_name_2)
         # Perform quality trimming of the raw/repaired FASTQ reads
+        # -> fastp
         if process_step(FASTP):
             fastp(fastq_file_name_1, fastq_file_name_2)
         # Map the trimmed FASTQ files to the reference FASTA file
+        # -> bwa-mem2 mem
         # Convert the SAM file into BAM format
+        # -> samtools view
         # Sort the BAM file
+        # -> samtools sort
         # Index the sorted BAM file
+        # -> samtools index
         # Delete the unsorted BAM and SAM files
         if process_step(MAPPING_BWA):
             map_bwa(fastq_file_name_1, fastq_file_name_2)
         # Create a mapping quality report
+        # -> qualimap bamqc
         if process_step(QUALIMAP_BAMQC):
             qualimap_bamqc(fastq_file_name_1)
 
